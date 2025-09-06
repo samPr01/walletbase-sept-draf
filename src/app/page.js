@@ -1,7 +1,8 @@
 'use client';
 
 import styles from '../styles/Landing.module.css';
-import { connectWallet, disconnectWallet, getProvider, getSigner, detectWallets, WALLET_TYPES, restoreWalletFromCookies, setupWalletListeners, removeWalletListeners } from '../lib/wallet';
+import WalletConnectButton from '../components/WalletConnectButton';
+import { useAccount } from 'wagmi';
 import { RECEIVING_ADDRESSES } from '../lib/config';
 import { fetchBTCBalance, getBTCAddressInfo, isValidBTCAddress } from '../lib/bitcoin';
 import { 
@@ -38,9 +39,9 @@ import { useUser } from '../contexts/UserContext';
 import Navigation from '../components/Navigation';
 
 export default function LandingPage() {
-  const { userId, walletAddress, updateUser, clearUser } = useUser();
+  const { userId, updateUser, clearUser } = useUser();
+  const { address: walletAddress, isConnected } = useAccount();
   const [cryptoData, setCryptoData] = useState([]);
-  const [isConnecting, setIsConnecting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [showDepositModal, setShowDepositModal] = useState(false);
@@ -64,8 +65,6 @@ export default function LandingPage() {
   });
   const [prices, setPrices] = useState({});
   const [lastPriceUpdate, setLastPriceUpdate] = useState(null);
-  const [availableWallets, setAvailableWallets] = useState([]);
-  const [showWalletModal, setShowWalletModal] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState('');
   const [showProofModal, setShowProofModal] = useState(false);
   const [transactionHash, setTransactionHash] = useState('');
@@ -103,62 +102,9 @@ export default function LandingPage() {
     loadTransferData();
   }, []);
 
-  // Detect available wallets and load wallet data from cookies on component mount
+  // Initialize loading state
   useEffect(() => {
-    const initializeWallet = async () => {
-      try {
-        console.log('Initializing wallet detection...');
-        
-        // Add a small delay to ensure window.ethereum is loaded
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
-        // Detect available wallets
-        const wallets = detectWallets();
-        console.log('Detected wallets:', wallets);
-        setAvailableWallets(wallets);
-        
-        // Set up wallet listeners
-        setupWalletListeners(
-          (newAddress) => {
-            console.log('Account changed:', newAddress);
-            updateUser(userId, newAddress);
-          },
-          (chainId) => {
-            console.log('Chain changed:', chainId);
-          },
-          () => {
-            console.log('Wallet disconnected');
-            clearUser();
-          }
-        );
-        
-        // Restore wallet connection from cookies
-        try {
-          const restoredAddress = await restoreWalletFromCookies();
-          if (restoredAddress) {
-            // Generate user ID for restored wallet
-            const newUserId = generateUserIdFromAddress(restoredAddress);
-            updateUser(newUserId, restoredAddress);
-            console.log('Restored wallet from cookies:', restoredAddress);
-            console.log('Generated User ID for restored wallet:', newUserId);
-          }
-        } catch (error) {
-          console.log('Wallet restoration failed:', error.message);
-        }
-        
-        setIsLoading(false);
-      } catch (error) {
-        console.error('Wallet initialization failed:', error);
-        setIsLoading(false);
-      }
-    };
-    
-    initializeWallet();
-    
-    // Cleanup wallet listeners on unmount
-    return () => {
-      removeWalletListeners();
-    };
+    setIsLoading(false);
   }, []);
 
   // Generate user ID and create user when wallet address changes
@@ -347,78 +293,7 @@ export default function LandingPage() {
     fetchBalances();
   }, [walletAddress]);
 
-  const handleConnect = async (walletType = WALLET_TYPES.METAMASK) => {
-    if (isConnecting) return;
-    
-    setIsConnecting(true);
-    setShowWalletModal(false);
-    
-    try {
-      console.log('Starting wallet connection...');
-      
-      const address = await connectWallet(walletType);
-      console.log('Wallet connection result:', address);
-      
-      // If address is null, user cancelled the connection
-      if (address === null) {
-        console.log('User cancelled wallet connection');
-        setIsConnecting(false); // Reset connecting state
-        return; // Just return without showing error or changing state
-      }
-      
-      // Generate user ID when wallet connects
-      const newUserId = generateUserIdFromAddress(address);
-      updateUser(newUserId, address);
-      
-      // Create or get user in the system
-      try {
-        const existingUser = await getUserByAddress(address);
-        if (!existingUser) {
-          const newUser = await createUser(address, newUserId);
-          console.log('✅ New user created in MongoDB:', newUser);
-        } else {
-          console.log('✅ Existing user found:', existingUser.userId);
-        }
-        
-        // Update user activity
-        await updateUserActivity(address);
-      } catch (error) {
-        console.error('❌ Error creating/updating user:', error);
-      }
-      console.log('Generated User ID:', newUserId);
-    } catch (error) {
-      console.error("Wallet connection failed:", error);
-      console.error("Error details:", {
-        message: error.message,
-        code: error.code,
-        stack: error.stack
-      });
-      
-      let errorMessage = error.message;
-      
-      // Handle specific wallet connection errors
-      if (error.message.includes('not installed')) {
-        errorMessage = 'Please install the wallet extension first.';
-      } else if (error.message.includes('User rejected') || 
-                 error.message.includes('cancelled by user') ||
-                 error.message.includes('Connection was cancelled')) {
-        errorMessage = 'Connection was cancelled. Please try again and approve the connection.';
-      } else if (error.message.includes('WalletConnect connection failed')) {
-        errorMessage = 'WalletConnect connection failed. Please try again or use an injected wallet.';
-      } else if (error.message.includes('No Web3 wallet detected')) {
-        errorMessage = 'No Web3 wallet detected. Please install MetaMask or another wallet extension.';
-      } else if (error.message.includes('No accounts found')) {
-        errorMessage = 'No accounts found. Please unlock your wallet and try again.';
-      }
-      
-      alert(errorMessage);
-    } finally {
-      setIsConnecting(false);
-    }
-  };
-
   const handleDisconnect = () => {
-    disconnectWallet();
     clearUser();
     setBalances({
       ETH: '0.0000',
@@ -1117,23 +992,12 @@ export default function LandingPage() {
             </div>
 
             <div className={styles.walletGateConnect}>
-              <button 
-                onClick={() => setShowWalletModal(true)}
-                className={styles.walletGateButton}
-                disabled={isConnecting}
-              >
-                {isConnecting ? (
-                  <>
-                    <div className={styles.spinner}></div>
-                    Connecting...
-                  </>
-                ) : (
-                  <>
-                    <span className={styles.walletIcon}>🔗</span>
-                    Connect Wallet
-                  </>
-                )}
-              </button>
+              <WalletConnectButton className={styles.walletGateButton}>
+                <>
+                  <span className={styles.walletIcon}>🔗</span>
+                  Connect Wallet
+                </>
+              </WalletConnectButton>
               
               <div className={styles.walletGateInfo}>
                 <p>Don't have a wallet? <a href="https://metamask.io/download/" target="_blank" rel="noopener noreferrer">Download MetaMask</a></p>
@@ -1143,58 +1007,6 @@ export default function LandingPage() {
           </div>
         </div>
 
-        {/* Wallet Selection Modal */}
-        {showWalletModal && (
-          <div className={styles.modalOverlay} onClick={() => setShowWalletModal(false)}>
-            <div className={styles.walletModal} onClick={(e) => e.stopPropagation()}>
-              <div className={styles.modalHeader}>
-                <h3>Choose Your Wallet</h3>
-                <button 
-                  className={styles.modalClose}
-                  onClick={() => setShowWalletModal(false)}
-                >
-                  ×
-                </button>
-              </div>
-              <div className={styles.modalBody}>
-                <div className={styles.walletGrid}>
-                  {availableWallets.map((wallet) => (
-                    <button
-                      key={wallet.type}
-                      className={styles.walletOption}
-                      onClick={() => handleConnect(wallet.type)}
-                      disabled={isConnecting}
-                    >
-                      <div className={styles.walletIcon}>{wallet.icon}</div>
-                      <div className={styles.walletInfo}>
-                        <div className={styles.walletName}>{wallet.name}</div>
-                        <div className={styles.walletDescription}>{wallet.description}</div>
-                      </div>
-                      {wallet.isInstalled && (
-                        <div className={styles.installedBadge}>Installed</div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-                
-                {availableWallets.length === 0 && (
-                  <div className={styles.noWallets}>
-                    <p>No Web3 wallets detected</p>
-                    <p>Please install a wallet extension to continue</p>
-                    <a 
-                      href="https://metamask.io/download/" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className={styles.installLink}
-                    >
-                      Install MetaMask
-                    </a>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
       </main>
     );
   }
@@ -1305,18 +1117,9 @@ export default function LandingPage() {
         <div className={styles.connectSection}>
           <h2>Connect Your Wallet</h2>
           <p>Connect your wallet to access the decentralized trading platform</p>
-          <button 
-            className={styles.connectButton}
-            onClick={() => setShowWalletModal(true)}
-            disabled={isConnecting || isLoading}
-          >
-            {isLoading ? 'Loading...' : isConnecting ? 'Connecting...' : 'Connect Wallet'}
-          </button>
-          {availableWallets.length === 0 && !isLoading && (
-            <p className={styles.noWalletsText}>
-              No Web3 wallets detected. Please install MetaMask or another wallet extension.
-            </p>
-          )}
+          <WalletConnectButton className={styles.connectButton}>
+            Connect Wallet
+          </WalletConnectButton>
         </div>
       )}
 
