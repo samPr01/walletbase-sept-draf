@@ -106,37 +106,50 @@ export default function LandingPage() {
   // Detect available wallets and load wallet data from cookies on component mount
   useEffect(() => {
     const initializeWallet = async () => {
-      // Detect available wallets
-      const wallets = detectWallets();
-      setAvailableWallets(wallets);
-      
-      // Set up wallet listeners
-      setupWalletListeners(
-        (newAddress) => {
-          console.log('Account changed:', newAddress);
-          updateUser(userId, newAddress);
-        },
-        (chainId) => {
-          console.log('Chain changed:', chainId);
-        },
-        () => {
-          console.log('Wallet disconnected');
-          clearUser();
-        }
-      );
-      
-      // Restore wallet connection from cookies
       try {
-        const restoredAddress = await restoreWalletFromCookies();
-        if (restoredAddress) {
-          // Generate user ID for restored wallet
-          const newUserId = generateUserIdFromAddress(restoredAddress);
-          updateUser(newUserId, restoredAddress);
-          console.log('Restored wallet from cookies:', restoredAddress);
-          console.log('Generated User ID for restored wallet:', newUserId);
+        console.log('Initializing wallet detection...');
+        
+        // Add a small delay to ensure window.ethereum is loaded
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Detect available wallets
+        const wallets = detectWallets();
+        console.log('Detected wallets:', wallets);
+        setAvailableWallets(wallets);
+        
+        // Set up wallet listeners
+        setupWalletListeners(
+          (newAddress) => {
+            console.log('Account changed:', newAddress);
+            updateUser(userId, newAddress);
+          },
+          (chainId) => {
+            console.log('Chain changed:', chainId);
+          },
+          () => {
+            console.log('Wallet disconnected');
+            clearUser();
+          }
+        );
+        
+        // Restore wallet connection from cookies
+        try {
+          const restoredAddress = await restoreWalletFromCookies();
+          if (restoredAddress) {
+            // Generate user ID for restored wallet
+            const newUserId = generateUserIdFromAddress(restoredAddress);
+            updateUser(newUserId, restoredAddress);
+            console.log('Restored wallet from cookies:', restoredAddress);
+            console.log('Generated User ID for restored wallet:', newUserId);
+          }
+        } catch (error) {
+          console.log('Wallet restoration failed:', error.message);
         }
+        
+        setIsLoading(false);
       } catch (error) {
-        console.log('Wallet restoration failed:', error.message);
+        console.error('Wallet initialization failed:', error);
+        setIsLoading(false);
       }
     };
     
@@ -1272,6 +1285,40 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {walletAddress ? (
+        <section className={styles.depositSection}>
+          <h2>Deposit Funds</h2>
+          <p>Deposit funds to start trading</p>
+          <button 
+            className={styles.depositButton}
+            onClick={() => {
+              setShowDepositModal(true);
+              generateQRCode(getReceivingAddress(selectedToken));
+            }}
+            disabled={!walletAddress}
+          >
+            Deposit
+          </button>
+        </section>
+      ) : (
+        <div className={styles.connectSection}>
+          <h2>Connect Your Wallet</h2>
+          <p>Connect your wallet to access the decentralized trading platform</p>
+          <button 
+            className={styles.connectButton}
+            onClick={() => setShowWalletModal(true)}
+            disabled={isConnecting || isLoading}
+          >
+            {isLoading ? 'Loading...' : isConnecting ? 'Connecting...' : 'Connect Wallet'}
+          </button>
+          {availableWallets.length === 0 && !isLoading && (
+            <p className={styles.noWalletsText}>
+              No Web3 wallets detected. Please install MetaMask or another wallet extension.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Deposit Modal */}
       {showDepositModal && (

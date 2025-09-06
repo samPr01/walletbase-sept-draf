@@ -89,7 +89,22 @@ export const detectWallets = () => {
   
   // Check if running in browser
   if (typeof window === 'undefined') {
+    console.log('Not in browser environment');
     return availableWallets;
+  }
+
+  console.log('Checking for wallets...');
+  console.log('window.ethereum:', !!window.ethereum);
+  
+  if (window.ethereum) {
+    console.log('window.ethereum properties:', {
+      isMetaMask: window.ethereum.isMetaMask,
+      isCoinbaseWallet: window.ethereum.isCoinbaseWallet,
+      isBraveWallet: window.ethereum.isBraveWallet,
+      isTrust: window.ethereum.isTrust,
+      isPhantom: window.ethereum.isPhantom,
+      isBinanceWallet: window.ethereum.isBinanceWallet
+    });
   }
 
   // MetaMask
@@ -99,6 +114,17 @@ export const detectWallets = () => {
       name: 'MetaMask',
       icon: '🦊',
       description: 'The most popular Web3 wallet',
+      isInstalled: true
+    });
+  }
+  
+  // Generic Ethereum wallet (if no specific wallet is detected but ethereum exists)
+  if (window.ethereum && availableWallets.length === 0) {
+    availableWallets.push({
+      type: WALLET_TYPES.METAMASK,
+      name: 'Ethereum Wallet',
+      icon: '🔗',
+      description: 'Generic Web3 wallet detected',
       isInstalled: true
     });
   }
@@ -167,6 +193,7 @@ export const detectWallets = () => {
     isInstalled: true
   });
 
+  console.log('Final detected wallets:', availableWallets);
   return availableWallets;
 };
 
