@@ -1,8 +1,11 @@
+'use client';
+
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { UserProvider } from '../contexts/UserContext';
-import { Web3Provider } from '../contexts/Web3Provider';
-import '../app/globals.css';
+import { WagmiProvider } from 'wagmi';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { wagmiConfig } from '../lib/web3modal-config';
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,13 +17,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata = {
-  title: 'WeWallet - Secure Cryptocurrency Wallet',
-  description: 'A modern, secure, and user-friendly cryptocurrency wallet for managing your digital assets.',
-  keywords: 'cryptocurrency, wallet, bitcoin, ethereum, blockchain, DeFi',
-  authors: [{ name: 'WeWallet Team' }],
-  viewport: 'width=device-width, initial-scale=1',
-};
+const queryClient = new QueryClient();
 
 export default function RootLayout({ children }) {
   return (
@@ -28,13 +25,19 @@ export default function RootLayout({ children }) {
       <head>
         <link rel="icon" href="/favicon.ico" />
         <meta name="theme-color" content="#000000" />
+        <title>WeWallet - Secure Cryptocurrency Wallet</title>
+        <meta name="description" content="A modern, secure, and user-friendly cryptocurrency wallet for managing your digital assets." />
+        <meta name="keywords" content="cryptocurrency, wallet, bitcoin, ethereum, blockchain, DeFi" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <Web3Provider>
-          <UserProvider>
-            {children}
-          </UserProvider>
-        </Web3Provider>
+        <QueryClientProvider client={queryClient}>
+          <WagmiProvider config={wagmiConfig}>
+            <UserProvider>
+              {children}
+            </UserProvider>
+          </WagmiProvider>
+        </QueryClientProvider>
       </body>
     </html>
   );

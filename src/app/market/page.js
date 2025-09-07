@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import Navigation from '../../components/Navigation';
 import { useUser } from '../../contexts/UserContext';
 import styles from './Market.module.css';
@@ -233,15 +234,12 @@ export default function MarketPage() {
                         </span>
                       </div>
                       <div className={styles.cryptoActions}>
-                        <button 
+                        <Link 
+                          href={`/trade/${coin.symbol.toLowerCase()}`}
                           className={styles.tradeButton}
-                          onClick={() => {
-                            setSelectedCrypto(coin);
-                            setShowWishlistModal(true);
-                          }}
                         >
                           Trade {coin.symbol}
-                        </button>
+                        </Link>
                         <button 
                           className={`${styles.wishlistToggle} ${isInWishlist(coin.id) ? styles.inWishlist : ''}`}
                           onClick={() => {

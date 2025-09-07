@@ -17,7 +17,7 @@ const metadata = {
 }
 
 const chains = [mainnet, arbitrum]
-export const config = defaultWagmiConfig({
+export const wagmiConfig = defaultWagmiConfig({
   chains,
   projectId,
   metadata,
@@ -25,7 +25,7 @@ export const config = defaultWagmiConfig({
 
 // 3. Create modal
 export const web3Modal = createWeb3Modal({
-  wagmiConfig: config,
+  wagmiConfig,
   projectId,
   enableAnalytics: true, // Optional - defaults to your Cloud configuration
   enableOnramp: true // Optional - false as default
